@@ -30,6 +30,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Collection;
+import java.util.Map;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialectProvider.SubprotocolBasedProvider;
 import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
@@ -40,6 +41,8 @@ import io.confluent.connect.jdbc.util.ExpressionBuilder;
 import io.confluent.connect.jdbc.util.ExpressionBuilder.Transform;
 import io.confluent.connect.jdbc.util.IdentifierRules;
 import io.confluent.connect.jdbc.util.TableId;
+import org.json.JSONObject;
+import org.postgresql.util.PGobject;
 
 /**
  * A {@link DatabaseDialect} for PostgreSQL.
@@ -212,9 +215,30 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
         return "TEXT";
       case BYTES:
         return "BYTEA";
+      case MAP:
+        return "JSON";
       default:
         return super.getSqlType(field);
     }
+  }
+
+  protected boolean maybeBindPrimitive(
+          PreparedStatement statement,
+          int index,
+          Schema schema,
+          Object value
+  ) throws SQLException {
+    switch (schema.type()) {
+      case MAP:
+        PGobject jsonObject = new PGobject();
+        jsonObject.setType("json");
+        jsonObject.setValue(new JSONObject((Map)value).toString());
+        statement.setObject(index, jsonObject);
+        return true;
+      default:
+        break;
+    }
+    return super.maybeBindPrimitive(statement, index, schema, value);
   }
 
   @Override
